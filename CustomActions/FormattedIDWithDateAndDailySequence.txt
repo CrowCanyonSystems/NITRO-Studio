@@ -1,0 +1,71 @@
+This example has code snippets for generating a custom Id that has two parts:
+1. Year, month and day of the date on which item was created
+2. A sequence that resets daily. So items created on a particular day get the sequence numbers in order of creation starting from 1.
+
+Format of the Id is YYYYMMDD-<sequence>
+
+TODO: Add links for relevant custom action configuration manuals
+
+
+This is done via a NITRO Custom Action that generates the Id and sets it in the item column. This action uses the following:
+1. Variable 'LatestPOId' that has the value of Id value of latest item. This will be used to find the next sequence to use in current item
+2. Variable 'NewPOId' that will have the new Id to set in current item
+3. Query list action to get the latest item to read the 'LatestPOId'
+4. Execute script action to generate the 'NewPOId'
+5. Update item action to save 'NewPOId' in current item
+
+
+CAML Query to use in Query list action is given below. It gets latest item created 'today' (prior to the current item):
+------------------------
+<View>
+	<Query>
+		<Where>
+			<And>
+				<Eq>
+					<FieldRef Name="Created" />
+					<Value Type="DateTime">
+						<Today/>
+					</Value>
+				</Eq>
+				<Neq>
+					<FieldRef Name="ID" />
+					<Value Type="Counter">%%[ID|ID]%%</Value>
+				</Neq>
+			</And>
+		</Where>
+		<OrderBy>
+			<FieldRef Name='ID'  Ascending='False' />
+		</OrderBy>
+	</Query>
+</View>
+
+
+
+Javascript code for Execute script action:
+------------------------
+var latestPOId = ccs_getwfvariablevalue('LatestPOId');
+var itemCreated = currentItem.get_item("Created");
+var seqNo = 1;
+
+try {
+    if (latestPOId) {
+        var seq = latestPOId.substring(latestPOId.indexOf('-') + 1);
+        if (seq) {
+            var num = parseInt(seq);
+            if (num && num > 0) {
+                seqNo = num + 1;
+            }
+        }
+    }
+} catch (error) {}
+
+var createdDate = new Date(itemCreated + "");
+var month = createdDate.getMonth() + 1;
+month = ("00" + month).slice(-2);
+var day = createdDate.getDate();
+day = ("00" + day).slice(-2);
+var seq = ("000" + seqNo).slice(-3);
+var poID = createdDate.getFullYear() + month + day + '-' + seq;
+
+ccs_setwfvariablevalue('NewPOId', poID);
+functionCallback();
